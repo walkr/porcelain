@@ -18,16 +18,12 @@ defmodule PorcelainTest.ChainingTest do
     erlang
     """
 
-    filter_a =
-      %Proc{out: stream_a} =
-        Porcelain.spawn("grep", ["a"], in: input, out: :stream)
+    filter_a = %Proc{out: stream_a} = Porcelain.spawn("grep", ["a"], in: input, out: :stream)
 
-    filter_e =
-      %Proc{out: stream_e} =
-        Porcelain.spawn("grep", ["e"], in: stream_a, out: :stream)
+    filter_e = %Proc{out: stream_e} = Porcelain.spawn("grep", ["e"], in: stream_a, out: :stream)
 
-    assert Porcelain.exec("sort", [], in: stream_e, out: :string)
-           == %Result{status: 0, out: "abcdef\nerlang\nsqueak\n", err: nil}
+    assert Porcelain.exec("sort", [], in: stream_e, out: :string) ==
+             %Result{status: 0, out: "abcdef\nerlang\nsqueak\n", err: nil}
 
     refute Proc.alive?(filter_a)
     refute Proc.alive?(filter_e)

@@ -9,7 +9,9 @@ defmodule Porcelain.App do
         # dummy supervisor
         opts = [strategy: :one_for_one, name: Porcelain.Supervisor]
         Supervisor.start_link([], opts)
-      other -> other
+
+      other ->
+        other
     end
   end
 end

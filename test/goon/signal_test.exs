@@ -11,15 +11,14 @@ defmodule PorcelainTest.GoonSignalTest do
   end
 
   test "kill signal" do
-    proc = Porcelain.spawn("grep", ["foo", "--line-buffered"],
-                                            in: :receive, out: {:send, self()})
+    proc = Porcelain.spawn("grep", ["foo", "--line-buffered"], in: :receive, out: {:send, self()})
 
     Proc.send_input(proc, "foo\nbar\n")
     :timer.sleep(100)
     assert Proc.alive?(proc)
 
     Proc.signal(proc, :kill)
-    #Proc.send_input(proc, "")
+    # Proc.send_input(proc, "")
     :timer.sleep(100)
     refute Proc.alive?(proc)
 
@@ -31,8 +30,7 @@ defmodule PorcelainTest.GoonSignalTest do
 
   @tag :posix
   test "term signal" do
-    proc = Porcelain.spawn("grep", ["foo", "--line-buffered"],
-                                            in: :receive, out: {:send, self()})
+    proc = Porcelain.spawn("grep", ["foo", "--line-buffered"], in: :receive, out: {:send, self()})
 
     Proc.send_input(proc, "foo\nbar\n")
     :timer.sleep(100)

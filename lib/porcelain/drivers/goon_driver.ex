@@ -21,7 +21,6 @@ defmodule Porcelain.Driver.Goon do
   alias Common.StreamServer
   @behaviour Common
 
-
   @doc false
   def exec(prog, args, opts) do
     do_exec(prog, args, opts, :noshell)
@@ -31,7 +30,6 @@ defmodule Porcelain.Driver.Goon do
   def exec_shell(prog, opts) do
     do_exec(prog, nil, opts, :shell)
   end
-
 
   @doc false
   def spawn(prog, args, opts) do
@@ -49,8 +47,14 @@ defmodule Porcelain.Driver.Goon do
     opts = Common.compile_options(opts)
     exe = find_executable(prog, opts, shell_flag)
     port = Port.open(exe, port_options(shell_flag, prog, args, opts))
+
     Common.communicate(
-      port, opts[:in], opts[:out], opts[:err], __MODULE__, async_input: opts[:async_in]
+      port,
+      opts[:in],
+      opts[:out],
+      opts[:err],
+      __MODULE__,
+      async_input: opts[:async_in]
     )
   end
 
@@ -58,32 +62,40 @@ defmodule Porcelain.Driver.Goon do
     opts = Common.compile_options(opts)
     exe = find_executable(prog, opts, shell_flag)
 
-    {out_opt, out_ret} = case opts[:out] do
-      :stream ->
-        {:ok, server} = StreamServer.start()
-        {{:stream, server}, Stream.unfold(server, &Common.read_stream/1)}
+    {out_opt, out_ret} =
+      case opts[:out] do
+        :stream ->
+          {:ok, server} = StreamServer.start()
+          {{:stream, server}, Stream.unfold(server, &Common.read_stream/1)}
 
-      {atom, ""} = opt when atom in [:string, :iodata] ->
-        {opt, atom}
+        {atom, ""} = opt when atom in [:string, :iodata] ->
+          {opt, atom}
 
-      other ->
-        {other, other}
-    end
+        other ->
+          {other, other}
+      end
 
-    pid = spawn(fn ->
-      port = Port.open(exe, port_options(shell_flag, prog, args, opts))
-      Common.communicate(
-        port, opts[:in], out_opt, opts[:err], __MODULE__, async_input: true, result: opts[:result]
-      )
-    end)
+    pid =
+      spawn(fn ->
+        port = Port.open(exe, port_options(shell_flag, prog, args, opts))
+
+        Common.communicate(
+          port,
+          opts[:in],
+          out_opt,
+          opts[:err],
+          __MODULE__,
+          async_input: true,
+          result: opts[:result]
+        )
+      end)
 
     %Porcelain.Process{
       pid: pid,
       out: out_ret,
-      err: opts[:err],
+      err: opts[:err]
     }
   end
-
 
   @proto_version "2.0"
 
@@ -92,7 +104,7 @@ defmodule Porcelain.Driver.Goon do
     if Common.find_executable(prog) do
       {:spawn_executable, goon_exe()}
     else
-      throw "Command not found: #{prog}"
+      throw("Command not found: #{prog}")
     end
   end
 
@@ -104,7 +116,6 @@ defmodule Porcelain.Driver.Goon do
     {:ok, goon} = Application.fetch_env(:porcelain, :driver_state)
     goon
   end
-
 
   defp port_options(:noshell, prog, args, opts) do
     args = List.flatten([goon_options(opts), "--", Common.find_executable(prog), args])
@@ -118,23 +129,27 @@ defmodule Porcelain.Driver.Goon do
   end
 
   defp goon_options(opts) do
-    out_opts = Enum.reduce(opts, [], fn
-     {:in, _}, acc -> ["-in"|acc]
-     {:out, _}, acc -> ["-out"|acc]
-     {:err, :out}, acc -> ["-err", "out" | acc]
-     {:err, other}, acc when not is_nil(other) -> ["-err", "err" | acc]
-     {:dir, dir}, acc -> ["-dir", dir | acc]
-     _, acc -> acc
-    end)
-    out_opts = case Application.fetch_env(:porcelain, :goon_driver_log) do
-      :error -> out_opts
-      {:ok, val} -> ["-log", val | out_opts]
-    end
+    out_opts =
+      Enum.reduce(opts, [], fn
+        {:in, _}, acc -> ["-in" | acc]
+        {:out, _}, acc -> ["-out" | acc]
+        {:err, :out}, acc -> ["-err", "out" | acc]
+        {:err, other}, acc when not is_nil(other) -> ["-err", "err" | acc]
+        {:dir, dir}, acc -> ["-dir", dir | acc]
+        _, acc -> acc
+      end)
+
+    out_opts =
+      case Application.fetch_env(:porcelain, :goon_driver_log) do
+        :error -> out_opts
+        {:ok, val} -> ["-log", val | out_opts]
+      end
+
     ["-proto", @proto_version | out_opts]
   end
 
   defp common_port_options(opts) do
-    [{:packet,2} | Common.port_options(opts)]
+    [{:packet, 2} | Common.port_options(opts)]
   end
 
   ###
@@ -150,7 +165,7 @@ defmodule Porcelain.Driver.Goon do
 
   # Maximum chunk size to fit in a single packet. One byte is used as a marker
   # in the Goex protocol v2.0.
-  @input_chunk_size 65535-1
+  @input_chunk_size 65535 - 1
 
   @doc false
   # EOF from user code
@@ -183,21 +198,22 @@ defmodule Porcelain.Driver.Goon do
   defp feed_in_chunks(_port, _data, _chunk_size, data_size, data_size), do: nil
 
   defp feed_in_chunks(port, data, chunk_size, start, data_size) do
-    size = min(chunk_size, data_size-start)
+    size = min(chunk_size, data_size - start)
     chunk = :binary.part(data, start, size)
     port_command(port, chunk)
-    feed_in_chunks(port, data, chunk_size, start+size, data_size)
+    feed_in_chunks(port, data, chunk_size, start + size, data_size)
   end
 
   defp for_each([], _fun), do: :ok
-  defp for_each([h|t], fun) do
+
+  defp for_each([h | t], fun) do
     fun.(h)
     for_each(t, fun)
   end
 
   defp port_command(port, data) do
-    Port.command(port, [0,data])
-    #:timer.sleep(1)
+    Port.command(port, [0, data])
+    # :timer.sleep(1)
   end
 
   defp send_eof(port) do
@@ -206,21 +222,21 @@ defmodule Porcelain.Driver.Goon do
 
   @doc false
   def send_signal(port, :int) do
-    Port.command(port, [1,128])
+    Port.command(port, [1, 128])
   end
 
   def send_signal(port, :kill) do
-    Port.command(port, [1,129])
+    Port.command(port, [1, 129])
   end
 
   def send_signal(port, sig) when is_integer(sig) do
-    Port.command(port, [1,sig])
+    Port.command(port, [1, sig])
   end
 
   @doc false
   def stop_process(port) do
     status = nil
-    #status = Port.command(port, [2, Application.get_env(:porcelain, :goon_stop_timeout, 10)])
+    # status = Port.command(port, [2, Application.get_env(:porcelain, :goon_stop_timeout, 10)])
     Port.close(port)
     status
   end
@@ -229,8 +245,12 @@ defmodule Porcelain.Driver.Goon do
 
   @doc false
   def check_goon_version(path) do
-    ackstr = for << <<byte>> <- :crypto.strong_rand_bytes(8) >>,
-                 byte != 0, into: "", do: <<byte>>
+    ackstr =
+      for <<(<<byte>> <- :crypto.strong_rand_bytes(8))>>,
+          byte != 0,
+          into: "",
+          do: <<byte>>
+
     args = ["-proto", @proto_version, "-ack", ackstr]
     opts = {[out: {:string, ""}], []}
     result = %Porcelain.Result{} = Porcelain.Driver.Basic.exec(path, args, opts)

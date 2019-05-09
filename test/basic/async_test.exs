@@ -11,8 +11,12 @@ defmodule PorcelainTest.BasicAsyncTest do
   @tag :posix
   test "spawn keep result" do
     cmd = "head -n 3 | cut -b 1-4"
-    proc = Porcelain.spawn_shell(cmd,
-                in: "multiple\nlines\nof input\nignored line\n")
+
+    proc =
+      Porcelain.spawn_shell(cmd,
+        in: "multiple\nlines\nof input\nignored line\n"
+      )
+
     assert %Proc{out: :string, err: nil} = proc
 
     :timer.sleep(100)
@@ -26,8 +30,10 @@ defmodule PorcelainTest.BasicAsyncTest do
   @tag :posix
   test "spawn discard result" do
     cmd = "head -n 3 | cut -b 1-4"
-    proc = Porcelain.spawn_shell(cmd,
-                in: "multiple\nlines\nof input\nignored line\n", result: :discard)
+
+    proc =
+      Porcelain.spawn_shell(cmd, in: "multiple\nlines\nof input\nignored line\n", result: :discard)
+
     assert %Proc{out: :string, err: nil} = proc
 
     :timer.sleep(100)
@@ -56,13 +62,14 @@ defmodule PorcelainTest.BasicAsyncTest do
 
     assert Enumerable.impl_for(proc.out) != nil
 
-    pid = spawn(fn ->
-      Proc.send_input(proc, "hello\n")
-      Proc.send_input(proc, ":mark:\n")
-      Proc.send_input(proc, "\n ignored \n")
-      Proc.send_input(proc, ":mark:")
-      Proc.send_input(proc, "\n ignored as well")
-    end)
+    pid =
+      spawn(fn ->
+        Proc.send_input(proc, "hello\n")
+        Proc.send_input(proc, ":mark:\n")
+        Proc.send_input(proc, "\n ignored \n")
+        Proc.send_input(proc, ":mark:")
+        Proc.send_input(proc, "\n ignored as well")
+      end)
 
     # in this test we used to check that each match generates a separate
     # element in the output stream, but input buffering used by the OS negates
@@ -74,8 +81,13 @@ defmodule PorcelainTest.BasicAsyncTest do
 
   test "spawn message passing" do
     self_pid = self()
-    proc = Porcelain.spawn("grep", [":mark:", "-m", "2", "--line-buffered"],
-                           in: :receive, out: {:send, self_pid})
+
+    proc =
+      Porcelain.spawn("grep", [":mark:", "-m", "2", "--line-buffered"],
+        in: :receive,
+        out: {:send, self_pid}
+      )
+
     proc_pid = proc.pid
 
     Proc.send_input(proc, ":mark:")
@@ -89,16 +101,21 @@ defmodule PorcelainTest.BasicAsyncTest do
 
     Proc.send_input(proc, "123 :mark:\n")
     assert_receive {^proc_pid, :data, :out, "123 :mark:\n"}
-    assert_receive {^proc_pid, :result,
-                      %Result{status: 0, out: {:send, ^self_pid}, err: nil}}
+    assert_receive {^proc_pid, :result, %Result{status: 0, out: {:send, ^self_pid}, err: nil}}
     refute Proc.alive?(proc)
   end
 
   @tag :posix
   test "spawn message passing no result" do
     self_pid = self()
-    proc = Porcelain.spawn_shell("grep :mark: -m 1",
-                       in: :receive, out: {:send, self_pid}, result: :discard)
+
+    proc =
+      Porcelain.spawn_shell("grep :mark: -m 1",
+        in: :receive,
+        out: {:send, self_pid},
+        result: :discard
+      )
+
     proc_pid = proc.pid
 
     Proc.send_input(proc, "-:mark:-")
@@ -115,15 +132,16 @@ defmodule PorcelainTest.BasicAsyncTest do
 
     stream_fn = fn acc ->
       send(pid, {:get_data, self()})
+
       receive do
-        {^pid, :done}       -> nil
+        {^pid, :done} -> nil
         {^pid, data} -> {data, acc}
       end
     end
+
     instream = Stream.unfold(nil, stream_fn)
 
-    proc = Porcelain.spawn("grep", [">end<", "-m", "2"],
-                        in: instream, out: :stream)
+    proc = Porcelain.spawn("grep", [">end<", "-m", "2"], in: instream, out: :stream)
     assert %Proc{err: nil} = proc
     assert is_pid(proc.pid)
     assert Enumerable.impl_for(proc.out) != nil
@@ -136,12 +154,15 @@ defmodule PorcelainTest.BasicAsyncTest do
     receive do
       {:get_data, pid} -> send(pid, {self(), ["hello", [?\s, "wor"], "ld"]})
     end
+
     receive do
       {:get_data, pid} -> send(pid, {self(), "|>end<|\n"})
     end
+
     receive do
       {:get_data, pid} -> send(pid, {self(), "ignore me\n"})
     end
+
     receive do
       {:get_data, pid} -> send(pid, {self(), [?>, ?e, [?n, [?d]], "<"]})
     end
@@ -152,6 +173,7 @@ defmodule PorcelainTest.BasicAsyncTest do
     receive do
       {:get_data, pid} -> send(pid, {self(), "\n"})
     end
+
     assert_receive :ok
     assert_receive "hello world|>end<|\n>end<\n"
 

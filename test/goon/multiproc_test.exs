@@ -15,7 +15,7 @@ defmodule PorcelainTest.MultiprocTest do
       "にほんごがすきです\n",
       "abcdef\n",
       "elixir\n",
-      "erlang\n",
+      "erlang\n"
     ]
 
     filter_s = %Proc{out: stream_s} = make_filter("s")
@@ -23,10 +23,13 @@ defmodule PorcelainTest.MultiprocTest do
     filter_go = %Proc{out: stream_go} = make_filter("ご")
 
     filters = [
-      {filter_s, stream_s}, {filter_i, stream_i}, {filter_go, stream_go}
+      {filter_s, stream_s},
+      {filter_i, stream_i},
+      {filter_go, stream_go}
     ]
 
     parent = self()
+
     Enum.each(filters, fn {proc, stream} ->
       spawn(fn -> send(parent, {proc, Enum.into(stream, "")}) end)
     end)
@@ -34,6 +37,7 @@ defmodule PorcelainTest.MultiprocTest do
     Enum.each(input, fn line ->
       Enum.each(filters, fn {proc, _} -> Proc.send_input(proc, line) end)
     end)
+
     no_receive(filters)
 
     Enum.each(filters, fn {proc, _} -> Proc.send_input(proc, "") end)
@@ -57,4 +61,3 @@ defmodule PorcelainTest.MultiprocTest do
     end)
   end
 end
-

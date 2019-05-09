@@ -11,21 +11,21 @@ defmodule PorcelainTest.BasicTest do
   end
 
   test "status" do
-    assert exec("date", [], out: nil)
-           == %Result{out: nil, err: nil, status: 0}
+    assert exec("date", [], out: nil) ==
+             %Result{out: nil, err: nil, status: 0}
   end
 
   test "stdout" do
     assert exec("echo", [], out: nil) == %Result{out: nil, err: nil, status: 0}
     assert exec("echo", []) == %Result{out: "\n", err: nil, status: 0}
 
-    assert exec("echo", ["-n", "Hello", "world"], out: :string)
-           == %Result{out: "Hello world", err: nil, status: 0}
+    assert exec("echo", ["-n", "Hello", "world"], out: :string) ==
+             %Result{out: "Hello world", err: nil, status: 0}
   end
 
   test "stderr" do
-    assert exec("date", ["rubbish"], out: nil, err: :out)
-           == %Result{out: nil, err: :out, status: 1}
+    assert exec("date", ["rubbish"], out: nil, err: :out) ==
+             %Result{out: nil, err: :out, status: 1}
 
     result = exec("date", ["rubbish"], err: :out)
     assert %Result{out: <<_::binary>>, err: :out, status: 1} = result
@@ -48,17 +48,19 @@ defmodule PorcelainTest.BasicTest do
   end
 
   test "dir" do
-    assert exec("sort", ["input.txt"], dir: fixture_path(""))
-           == %Result{out: "file\nfrom\ninput\n", err: nil, status: 0}
+    assert exec("sort", ["input.txt"], dir: fixture_path("")) ==
+             %Result{out: "file\nfrom\ninput\n", err: nil, status: 0}
   end
 
   @tag :posix
   test "env" do
     cmd = "echo $custom_var"
-    assert shell(cmd, env: [custom_var: "hello"])
-           == %Result{out: "hello\n", err: nil, status: 0}
-    assert shell(cmd, env: %{"custom_var" => "bye"})
-           == %Result{out: "bye\n", err: nil, status: 0}
+
+    assert shell(cmd, env: [custom_var: "hello"]) ==
+             %Result{out: "hello\n", err: nil, status: 0}
+
+    assert shell(cmd, env: %{"custom_var" => "bye"}) ==
+             %Result{out: "bye\n", err: nil, status: 0}
   end
 
   @tag :posix
@@ -78,44 +80,50 @@ defmodule PorcelainTest.BasicTest do
   end
 
   test "input string" do
-    assert exec("grep", [">end<", "-m", "2"],
-                    in: "hi\n>end< once\nbye\n>end< twice\n")
-           == %Result{out: ">end< once\n>end< twice\n", err: nil, status: 0}
+    assert exec("grep", [">end<", "-m", "2"], in: "hi\n>end< once\nbye\n>end< twice\n") ==
+             %Result{out: ">end< once\n>end< twice\n", err: nil, status: 0}
   end
 
   test "input iodata" do
-    input = ["hi\n", [?>, [?e, ?n], "d< onc"],
-                    "e\nb", ["y", ["e", ?\n], ">end< twice\n"]]
-    assert exec("grep", [">end<", "-m", "2"], in: input)
-           == %Result{out: ">end< once\n>end< twice\n", err: nil, status: 0}
+    input = ["hi\n", [?>, [?e, ?n], "d< onc"], "e\nb", ["y", ["e", ?\n], ">end< twice\n"]]
+
+    assert exec("grep", [">end<", "-m", "2"], in: input) ==
+             %Result{out: ">end< once\n>end< twice\n", err: nil, status: 0}
   end
 
   test "input stream" do
-    input = Stream.concat(["hello", ["th", [?i, ?s], "is \nthe"], [">e"]],
-                          [[[?n, "d<\n"], "again\n"], ">e", "nd< final", ?\n])
-    assert exec("grep", [">end<", "-m", "2"], in: input)
-           == %Result{out: "the>end<\n>end< final\n", err: nil, status: 0}
+    input =
+      Stream.concat(
+        ["hello", ["th", [?i, ?s], "is \nthe"], [">e"]],
+        [[[?n, "d<\n"], "again\n"], ">e", "nd< final", ?\n]
+      )
+
+    assert exec("grep", [">end<", "-m", "2"], in: input) ==
+             %Result{out: "the>end<\n>end< final\n", err: nil, status: 0}
 
     stream = File.stream!(fixture_path("input.txt"))
-    assert exec("head", ["-n", "3"], in: stream)
-           == %Result{out: "input\nfrom\nfile\n", err: nil, status: 0}
+
+    assert exec("head", ["-n", "3"], in: stream) ==
+             %Result{out: "input\nfrom\nfile\n", err: nil, status: 0}
   end
 
   @tag :posix
   test "input path" do
     cmd = "head -n 3 | sort"
     path = fixture_path("input.txt")
-    assert shell(cmd, in: {:path, path})
-           == %Result{out: "file\nfrom\ninput\n", err: nil, status: 0}
+
+    assert shell(cmd, in: {:path, path}) ==
+             %Result{out: "file\nfrom\ninput\n", err: nil, status: 0}
   end
 
   @tag :posix
   test "input file" do
     cmd = "head -n 3 | sort -r"
     path = fixture_path("input.txt")
+
     File.open(path, fn file ->
-      assert shell(cmd, in: {:file, file})
-             == %Result{out: "input\nfrom\nfile\n", err: nil, status: 0}
+      assert shell(cmd, in: {:file, file}) ==
+               %Result{out: "input\nfrom\nfile\n", err: nil, status: 0}
     end)
   end
 
@@ -123,42 +131,50 @@ defmodule PorcelainTest.BasicTest do
   test "input raw file" do
     cmd = "head -n 3 | sort -r"
     path = fixture_path("input.txt")
+
     File.open(path, [:raw], fn file ->
-      assert shell(cmd, in: {:file, file})
-             == %Result{out: "input\nfrom\nfile\n", err: nil, status: 0}
+      assert shell(cmd, in: {:file, file}) ==
+               %Result{out: "input\nfrom\nfile\n", err: nil, status: 0}
     end)
   end
 
   test "async input" do
-    assert exec("grep", [">end<", "-m", "2"], in: "hi\n>end< once\nbye\n>end< twice\n", async_in: true)
-           == %Result{out: ">end< once\n>end< twice\n", err: nil, status: 0}
+    assert exec("grep", [">end<", "-m", "2"],
+             in: "hi\n>end< once\nbye\n>end< twice\n",
+             async_in: true
+           ) ==
+             %Result{out: ">end< once\n>end< twice\n", err: nil, status: 0}
   end
 
   @tag :posix
   test "output iodata" do
     cmd = "head -n 4 | sort"
     result = shell(cmd, in: "this\nis\nthe\nend\n", out: :iodata)
-    assert %Result{out: [_|_], err: nil, status: 0} = result
+    assert %Result{out: [_ | _], err: nil, status: 0} = result
     assert IO.iodata_to_binary(result.out) == "end\nis\nthe\nthis\n"
   end
 
   @tag :posix
   test "output path" do
     cmd = "head -n 4 | sort"
-    outpath = Path.join(System.tmp_dir, "tmpoutput")
+    outpath = Path.join(System.tmp_dir(), "tmpoutput")
     File.rm_rf!(outpath)
-    assert shell(cmd, in: "this\nis\nthe\nend\n", out: {:path, outpath})
-           == %Result{out: {:path, outpath}, err: nil, status: 0}
+
+    assert shell(cmd, in: "this\nis\nthe\nend\n", out: {:path, outpath}) ==
+             %Result{out: {:path, outpath}, err: nil, status: 0}
+
     assert File.read!(outpath) == "end\nis\nthe\nthis\n"
   end
 
   @tag :posix
   test "output append" do
     cmd = "head -n 4 | sort"
-    outpath = Path.join(System.tmp_dir, "tmpoutput")
+    outpath = Path.join(System.tmp_dir(), "tmpoutput")
     File.write!(outpath, "hello.")
-    assert shell(cmd, in: "this\nis\nthe\nend\n", out: {:append, outpath})
-           == %Result{out: {:path, outpath}, err: nil, status: 0}
+
+    assert shell(cmd, in: "this\nis\nthe\nend\n", out: {:append, outpath}) ==
+             %Result{out: {:path, outpath}, err: nil, status: 0}
+
     assert File.read!(outpath) == "hello.end\nis\nthe\nthis\n"
   end
 
@@ -166,15 +182,18 @@ defmodule PorcelainTest.BasicTest do
   test "output file" do
     cmd = "head -n 3 | sort"
     inpath = fixture_path("input.txt")
-    outpath = Path.join(System.tmp_dir, "tmpoutput")
+    outpath = Path.join(System.tmp_dir(), "tmpoutput")
     File.rm_rf!(outpath)
+
     File.open(outpath, [:write], fn file ->
       :ok = IO.write(file, "hello.")
       pos = 4
       {:ok, ^pos} = :file.position(file, pos)
-      assert shell(cmd, in: {:path, inpath}, out: {:file, file})
-             == %Result{out: {:file, file}, err: nil, status: 0}
+
+      assert shell(cmd, in: {:path, inpath}, out: {:file, file}) ==
+               %Result{out: {:file, file}, err: nil, status: 0}
     end)
+
     assert File.read!(outpath) == "hellfile\nfrom\ninput\n"
   end
 
@@ -182,15 +201,18 @@ defmodule PorcelainTest.BasicTest do
   test "output raw file" do
     cmd = "head -n 3 | sort"
     inpath = fixture_path("input.txt")
-    outpath = Path.join(System.tmp_dir, "tmpoutput")
+    outpath = Path.join(System.tmp_dir(), "tmpoutput")
     File.rm_rf!(outpath)
+
     File.open(outpath, [:raw, :write], fn file ->
       :ok = :file.write(file, "hello.")
       pos = 4
       {:ok, ^pos} = :file.position(file, pos)
-      assert shell(cmd, in: {:path, inpath}, out: {:file, file})
-             == %Result{out: {:file, file}, err: nil, status: 0}
+
+      assert shell(cmd, in: {:path, inpath}, out: {:file, file}) ==
+               %Result{out: {:file, file}, err: nil, status: 0}
     end)
+
     assert File.read!(outpath) == "hellfile\nfrom\ninput\n"
   end
 
@@ -201,16 +223,18 @@ defmodule PorcelainTest.BasicTest do
     cmd = "head -n 6 | sort"
     input = "b\nd\nz\na\nc\ng\n"
     stream = IO.binstream(:stdio, :line)
+
     assert capture_io(fn ->
-      assert shell(cmd, in: input, out: stream)
-             == %Result{out: stream, err: nil, status: 0}
-    end) == "a\nb\nc\nd\ng\nz\n"
+             assert shell(cmd, in: input, out: stream) ==
+                      %Result{out: stream, err: nil, status: 0}
+           end) == "a\nb\nc\nd\ng\nz\n"
   end
 
   test "collectable string" do
     input = "1\nhi\n2\nhi \n"
-    assert exec("grep", ["hi", "-m", "2"], in: input, out: "hello: ")
-           == %Result{out: "hello: hi\nhi \n", err: nil, status: 0}
+
+    assert exec("grep", ["hi", "-m", "2"], in: input, out: "hello: ") ==
+             %Result{out: "hello: hi\nhi \n", err: nil, status: 0}
   end
 
   test "large input" do
@@ -219,12 +243,14 @@ defmodule PorcelainTest.BasicTest do
     small_input = String.duplicate("a", small_size)
     large_input = String.duplicate("b", large_size)
 
-    assert %Porcelain.Result{out: out, status: 0}
-           = Porcelain.shell("head -c #{small_size} | wc -c", in: small_input)
+    assert %Porcelain.Result{out: out, status: 0} =
+             Porcelain.shell("head -c #{small_size} | wc -c", in: small_input)
+
     assert String.trim(out) == "#{small_size}"
 
-    assert %Porcelain.Result{out: out, status: 0}
-           = Porcelain.shell("head -c #{large_size} | wc -c", in: large_input)
+    assert %Porcelain.Result{out: out, status: 0} =
+             Porcelain.shell("head -c #{large_size} | wc -c", in: large_input)
+
     assert String.trim(out) == "#{large_size}"
   end
 end

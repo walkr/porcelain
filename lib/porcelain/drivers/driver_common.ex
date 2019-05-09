@@ -1,47 +1,46 @@
 defmodule Porcelain.Driver.Common do
   @moduledoc false
 
-  @callback exec(prog :: binary, args :: [binary], opts :: Keyword.t) :: Porcelain.Result.t
-  @callback exec_shell(prog :: binary, opts :: Keyword.t) :: Porcelain.Result.t
-  @callback spawn(prog :: binary, args :: [binary], opts :: Keyword.t) :: Porcelain.Process.t
-  @callback spawn_shell(prog :: binary, opts :: Keyword.t) :: Porcelain.Process.t
+  @callback exec(prog :: binary, args :: [binary], opts :: Keyword.t()) :: Porcelain.Result.t()
+  @callback exec_shell(prog :: binary, opts :: Keyword.t()) :: Porcelain.Result.t()
+  @callback spawn(prog :: binary, args :: [binary], opts :: Keyword.t()) :: Porcelain.Process.t()
+  @callback spawn_shell(prog :: binary, opts :: Keyword.t()) :: Porcelain.Process.t()
 
   @callback feed_input(port :: port, input :: iodata) :: any
   @callback process_data(data :: binary, output :: any, error :: any) :: {any, any}
-  @callback send_signal(port :: port, signal :: Porcelain.Process.signal) :: boolean | nil
+  @callback send_signal(port :: port, signal :: Porcelain.Process.signal()) :: boolean | nil
   @callback stop_process(port :: port) :: integer | nil
 
-
   alias Porcelain.Driver.Common.StreamServer
-
 
   def find_executable(prog) do
     cond do
       File.exists?(prog) ->
         Path.absname(prog)
-      exe=:os.find_executable(:erlang.binary_to_list(prog)) ->
+
+      exe = :os.find_executable(:erlang.binary_to_list(prog)) ->
         List.to_string(exe)
-      true -> false
+
+      true ->
+        false
     end
   end
-
 
   def compile_options({opts, []}) do
     opts
   end
 
   def compile_options({_opts, extra_opts}) do
-    msg = "Invalid options: #{inspect extra_opts}"
+    msg = "Invalid options: #{inspect(extra_opts)}"
     raise Porcelain.UsageError, message: msg
   end
 
   @common_options [:binary, :use_stdio, :exit_status, :hide]
   def port_options(opts) do
-    @common_options
-    ++ (if env=opts[:env], do: [{:env, env}], else: [])
-    ++ (if opts[:in] && !(opts[:out] || opts[:err]), do: [:in], else: [])
+    @common_options ++
+      if(env = opts[:env], do: [{:env, env}], else: []) ++
+      if opts[:in] && !(opts[:out] || opts[:err]), do: [:in], else: []
   end
-
 
   def shell_command(command) do
     {:ok, {sh, args}} = Application.fetch_env(:porcelain, :shell_command)
@@ -52,7 +51,7 @@ defmodule Porcelain.Driver.Common do
 
   def read_stream(server) do
     case StreamServer.get_data(server) do
-      nil  -> nil
+      nil -> nil
       data -> {data, server}
     end
   end
@@ -68,14 +67,15 @@ defmodule Porcelain.Driver.Common do
         pipe_file(fid, port, input_handler)
 
       {:path, path} ->
-        File.open(path, [:read], fn(fid) ->
+        File.open(path, [:read], fn fid ->
           pipe_file(fid, port, input_handler)
         end)
 
       null when null in [nil, :receive] ->
         nil
 
-      other -> stream_to_port(other, port, input_handler)
+      other ->
+        stream_to_port(other, port, input_handler)
     end
   end
 
@@ -85,9 +85,9 @@ defmodule Porcelain.Driver.Common do
     # we read files in blocks to avoid excessive memory usage
     Stream.repeatedly(fn -> :file.read(fid, @file_chunk_size) end)
     |> Stream.take_while(fn
-      :eof        -> false
+      :eof -> false
       {:error, _} -> false
-      _           -> true
+      _ -> true
     end)
     |> Stream.map(fn {:ok, data} -> data end)
     |> stream_to_port(port, input_handler)
@@ -100,12 +100,14 @@ defmodule Porcelain.Driver.Common do
         iodata when is_list(iodata) or is_binary(iodata) ->
           # the sleep is needed to work around the problem of port hanging
           input_handler.(port, iodata)
+
         byte ->
           input_handler.(port, [byte])
       end)
     catch
       :error, :badarg -> nil
     end
+
     input_handler.(port, :eof)
   end
 
@@ -114,28 +116,31 @@ defmodule Porcelain.Driver.Common do
   def communicate(port, input, output, error, callback_module, opts) do
     port_input_handler = &callback_module.feed_input/2
     input_fun = fn -> send_input(port, input, port_input_handler) end
+
     if opts[:async_input] do
       spawn(input_fun)
     else
       input_fun.()
     end
+
     collect_output(port, output, error, opts[:result], callback_module)
   end
 
   defp collect_output(port, output, error, result_opt, callback_module) do
     receive do
-      { ^port, {:data, data} } ->
+      {^port, {:data, data}} ->
         {output, error} = callback_module.process_data(data, output, error)
         collect_output(port, output, error, result_opt, callback_module)
 
-      { ^port, {:exit_status, status} } ->
+      {^port, {:exit_status, status}} ->
         result = finalize_result(status, output, error)
-        send_result(output, error, result_opt, result)
-        || case result_opt do
-          nil      -> result
-          :discard -> nil
-          :keep    -> wait_for_command(result)
-        end
+
+        send_result(output, error, result_opt, result) ||
+          case result_opt do
+            nil -> result
+            :discard -> nil
+            :keep -> wait_for_command(result)
+          end
 
       {:input, data} ->
         callback_module.feed_input(port, data)
@@ -163,24 +168,28 @@ defmodule Porcelain.Driver.Common do
     result = if opt == :discard, do: nil, else: result
     msg = {self(), :result, result}
 
-    out_ret = case out do
-      {:send, pid} ->
-        send(pid, msg)
-        true
+    out_ret =
+      case out do
+        {:send, pid} ->
+          send(pid, msg)
+          true
 
-      _ -> false
-    end
+        _ ->
+          false
+      end
 
-    err_ret = case {err, out} do
-      {{:send, pid}, {:send, pid}} ->
-        true
+    err_ret =
+      case {err, out} do
+        {{:send, pid}, {:send, pid}} ->
+          true
 
-      {{:send, pid}, _} ->
-        send(pid, msg)
-        true
+        {{:send, pid}, _} ->
+          send(pid, msg)
+          true
 
-      _ -> false
-    end
+        _ ->
+          false
+      end
 
     out_ret or err_ret
   end
@@ -189,6 +198,7 @@ defmodule Porcelain.Driver.Common do
     receive do
       {:stop, from, ref} ->
         send(from, {ref, :stopped})
+
       {:get_result, from, ref} ->
         send(from, {ref, result})
     end
@@ -201,12 +211,11 @@ defmodule Porcelain.Driver.Common do
   end
 
   def process_port_output({typ, data}, new_data, _iostream)
-    when typ in [:string, :iodata]
-  do
+      when typ in [:string, :iodata] do
     {typ, [data, new_data]}
   end
 
-  def process_port_output({:file, fid}=x, data, _iostream) do
+  def process_port_output({:file, fid} = x, data, _iostream) do
     :ok = :file.write(fid, data)
     x
   end
@@ -221,22 +230,22 @@ defmodule Porcelain.Driver.Common do
     process_port_output({:path, path, fid}, data, iostream)
   end
 
-  def process_port_output({:path, _, fid}=x, data, _iostream) do
+  def process_port_output({:path, _, fid} = x, data, _iostream) do
     :ok = IO.write(fid, data)
     x
   end
 
-  def process_port_output({:stream, server}=x, data, _iostream) do
+  def process_port_output({:stream, server} = x, data, _iostream) do
     StreamServer.put_data(server, data)
     x
   end
 
-  def process_port_output({:send, pid}=x, data, iostream) do
+  def process_port_output({:send, pid} = x, data, iostream) do
     send(pid, {self(), :data, iostream, data})
     x
   end
 
-  def process_port_output({:into, _, server}=x, data, _iostream) do
+  def process_port_output({:into, _, server} = x, data, _iostream) do
     StreamServer.put_data(server, data)
     x
   end
@@ -244,25 +253,39 @@ defmodule Porcelain.Driver.Common do
   def process_port_output(coll, data, iostream) do
     {:ok, server} = StreamServer.start()
     parent = self()
+
     spawn(fn ->
       ret = Enum.into(Stream.unfold(server, &read_stream/1), coll)
       send(parent, {:into, ret, server})
     end)
+
     process_port_output({:into, coll, server}, data, iostream)
   end
 
   defp flatten(thing) do
     case thing do
-      {:string, data}    -> IO.iodata_to_binary(data)
-      {:iodata, data}    -> data
-      {:path, path, fid} -> File.close(fid); {:path, path}
-      {:stream, server}  -> StreamServer.finish(server)
+      {:string, data} ->
+        IO.iodata_to_binary(data)
+
+      {:iodata, data} ->
+        data
+
+      {:path, path, fid} ->
+        File.close(fid)
+        {:path, path}
+
+      {:stream, server} ->
+        StreamServer.finish(server)
+
       {:into, _, server} ->
         StreamServer.finish(server)
+
         receive do
           {:into, ret, ^server} -> ret
         end
-      other -> other
+
+      other ->
+        other
     end
   end
 end
