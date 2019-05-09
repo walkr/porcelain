@@ -12,6 +12,10 @@ defmodule Porcelain.Driver.Common.StreamServer do
     GenServer.start(__MODULE__, state(chunks: :queue.new()))
   end
 
+  def init(args) do
+    {:ok, args}
+  end
+
   def get_data(pid) do
     log("Stream server get data #{inspect(self())}")
     GenServer.call(pid, :get_data, :infinity)
